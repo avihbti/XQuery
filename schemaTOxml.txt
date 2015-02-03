@@ -1,0 +1,228 @@
+xquery version "1.0-ml";
+
+import module namespace mem = "http://xqdev.com/in-mem-update" 
+at "in-mem-update.xqy";
+
+declare default function namespace "http://www.w3.org/2005/xpath-functions";
+
+declare namespace xs = "http://www.w3.org/2001/XMLSchema";
+
+declare variable $addNode as xs:integer := 0;
+
+declare variable $schema := 
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="GetDemographicRes">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="Status"/>
+        <xs:element ref="memberDemographics"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Status">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="StatusCode"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="StatusCode" type="xs:integer"/>
+  <xs:element name="memberDemographics">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="relationshipToSubscriber"/>
+        <xs:element ref="privacyRestriction"/>
+        <xs:element ref="dateEnrolled"/>
+        <xs:element ref="dateTerminated"/>
+        <xs:element name="person">
+        	<xs:complexType>
+      			<xs:sequence>
+			        <xs:element ref="gender"/>
+			        <xs:element ref="nameFirst"/>
+			        <xs:element ref="nameMiddle"/>
+			        <xs:element ref="nameLast"/>
+			        <xs:element ref="nameTitle"/>
+			        <xs:element ref="namePrefix"/>
+			        <xs:element ref="nameSuffix"/>
+			        <xs:element ref="nameFull"/>
+			        <xs:element ref="dateOfBirth"/>
+			        <xs:element minOccurs="0" ref="contacts"/>
+      			</xs:sequence>
+    			</xs:complexType>
+        </xs:element>	
+        <xs:element maxOccurs="unbounded" ref="dependents"/>
+        <xs:element ref="membershipsLinks"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="dependents">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="relationshipToSubscriber"/>
+        <xs:element ref="privacyRestriction"/>
+        <xs:element ref="dateEnrolled"/>
+        <xs:element ref="dateTerminated"/>
+        <xs:element name="person">
+			    <xs:complexType>
+			      <xs:sequence>
+			        <xs:element ref="gender"/>
+			        <xs:element ref="nameFirst"/>
+			        <xs:element ref="nameMiddle"/>
+			        <xs:element ref="nameLast"/>
+			        <xs:element ref="nameTitle"/>
+			        <xs:element ref="namePrefix"/>
+			        <xs:element ref="nameSuffix"/>
+			        <xs:element ref="nameFull"/>
+			        <xs:element ref="dateOfBirth"/>
+			      </xs:sequence>
+			    </xs:complexType>
+			  </xs:element>
+        <xs:element ref="membershipsLinks"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="relationshipToSubscriber" type="xs:NCName"/>
+  <xs:element name="privacyRestriction" type="xs:boolean"/>
+  <xs:element name="dateEnrolled" type="xs:date"/>
+  <xs:element name="dateTerminated" type="xs:date"/>
+  <xs:element name="gender" type="xs:NCName"/>
+  <xs:element name="nameFirst" type="xs:NCName"/>
+  <xs:element name="nameMiddle" type="xs:string"/>
+  <xs:element name="nameLast" type="xs:NCName"/>
+  <xs:element name="nameTitle" type="xs:integer"/>
+  <xs:element name="namePrefix" type="xs:NCName"/>
+  <xs:element name="nameSuffix" type="xs:NCName"/>
+  <xs:element name="nameFull" type="xs:string"/>
+  <xs:element name="dateOfBirth" type="xs:date"/>
+  <xs:element name="contacts">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="usage"/>
+        <xs:element ref="emailAddresses"/>
+        <xs:element ref="postalAddresses"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="usage" type="xs:NCName"/>
+  <xs:element name="emailAddresses">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="domain"/>
+        <xs:element ref="address"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="domain" type="xs:string"/>
+  <xs:element name="address" type="xs:string"/>
+  <xs:element name="postalAddresses">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="state"/>
+        <xs:element ref="city"/>
+        <xs:element ref="postalCode"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="state" type="xs:NCName"/>
+  <xs:element name="city" type="xs:NCName"/>
+  <xs:element name="postalCode" type="xs:integer"/>
+  <xs:element name="membershipsLinks">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="_a"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="_a">
+    <xs:complexType>
+      <xs:attribute name="accessTokenType" type="xs:NCName"/>
+      <xs:attribute name="href" use="required" type="xs:anyURI"/>
+      <xs:attribute name="resource" use="required" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>;
+
+declare function local:process-element($element as node()) { 
+     typeswitch ($element)
+        
+        case  element(xs:schema)   return
+              for $sub-element in  $element/*
+                 return  local:process-element($sub-element)
+        
+        case element(xs:annotation) return
+              ()
+        
+        case  element(xs:element)   return 
+               let $min := 
+                     if ($element/@minOccurs)
+                     then
+                         ($element/@minOccurs/string())
+                     else 1
+                              
+               let $max := 
+                     if ($element/@maxOccurs)
+                     then
+                         if ($element/@maxOccurs/string() = "unbounded") 
+                         then 5
+                         else ($element/@maxOccurs/string())
+                     else 1
+               let $count := $max
+               return 
+                  if ($count  >0 )
+                  then 
+                      for $i in 1 to $count
+                      return
+                         if ($element/@ref)  
+                         then 
+                              local:process-element(document{$schema}/xs:schema/xs:element[@name=$element/@ref/string()])
+                         else    
+                         if (document{$schema}/xs:schema/xs:complexType[@name=$element/@type]) 
+                         then 
+                             element {$element/@name} {                           
+                                   local:process-element(document{$schema}/xs:schema/xs:complexType[@name=$element/@type/string()])
+                             }
+                         else 
+                         ((if ($addNode=1)
+                          then 
+                               (xdmp:node-insert-child((doc("intermediateXML.xml")//node()/*)[last()], element {$element/@name}{$addNode}))
+                          else
+                               (xdmp:node-insert-after((doc("intermediateXML.xml")//node()/*)[last()], element {$element/@name}{$addNode})),
+                                
+                         element {$element/@name} {       
+                         
+                             if  ($element/*)
+                             then 
+                             for $sub-element in $element/*
+                                 return local:process-element($sub-element)
+                             else  ($element/@name/string())
+                             }, xdmp:set($addNode,0)))
+                                                    
+                    else ("ELSE")
+              
+        case element(xs:attribute)   return
+                 if ($element/@use="required" or empty($element/@use))
+                 then 
+                     attribute {$element/@name} { $element/@name/string() }
+                 else () 
+         
+        case  element(xs:all)   return
+                 for $sub-element  in $element/*
+                 return local:process-element($sub-element)
+        
+        case  element(xs:sequence)   return
+                  (xdmp:set($addNode,1),
+                 for $sub-element in $element/*
+                       return local:process-element($sub-element))
+        
+        case  element(xs:complexType)   return 
+              for $sub-element in $element/*
+                       return local:process-element($sub-element)
+                 
+       default return ("DEFAULT")
+};
+
+
+
+let $xml := local:process-element($schema)
+
+return $xml[1]
